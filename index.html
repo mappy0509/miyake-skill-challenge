@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miyake Dunks Skill Challenge</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel to transpile JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Custom Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #000000; }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- 共通データを読み込み -->
+    <script src="shared_data.js"></script>
+
+    <script type="text/babel">
+        // --- アイコンコンポーネント ---
+        const VideoCameraIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 001.553.832l3-2a1 1 0 000-1.664l-3-2z" />
+            </svg>
+        );
+        const LogoutIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+        );
+
+        // --- 画面コンポーネント ---
+        
+        function LoginScreen({ onLogin, goToSignUp }) {
+            return (
+                <div className="p-6 flex flex-col justify-center min-h-screen">
+                    <h1 className="text-4xl font-bold text-green-400 text-center">MIYAKE D'UNKS</h1>
+                    <p className="text-center text-gray-400 mt-2 mb-12">SKILL CHALLENGE APP</p>
+                    
+                    <div className="space-y-4">
+                        <input type="email" placeholder="メールアドレス" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="password" placeholder="パスワード" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                    </div>
+                    
+                    <button onClick={onLogin} className="w-full mt-8 bg-green-500 text-black p-4 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">
+                        ログイン
+                    </button>
+                    
+                    <button onClick={goToSignUp} className="mt-4 text-center text-green-400 hover:text-green-300">
+                        アカウント新規登録はこちら
+                    </button>
+                </div>
+            );
+        }
+
+        function SignUpScreen({ onSignUp, goToLogin }) {
+            return (
+                <div className="p-6 flex flex-col justify-center min-h-screen">
+                    <h1 className="text-3xl font-bold text-green-400 text-center mb-8">アカウント作成</h1>
+                    
+                    <div className="space-y-4">
+                        <input type="text" placeholder="名前 (フルネーム)" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="email" placeholder="メールアドレス" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="password" placeholder="パスワード" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="password" placeholder="パスワード (確認用)" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                    </div>
+                    
+                    <button onClick={onSignUp} className="w-full mt-8 bg-green-500 text-black p-4 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">
+                        登録する
+                    </button>
+
+                     <button onClick={goToLogin} className="mt-4 text-center text-green-400 hover:text-green-300">
+                        ログイン画面に戻る
+                    </button>
+                </div>
+            );
+        }
+
+        function DashboardScreen({ player, onLogout }) {
+            const [currentTab, setCurrentTab] = React.useState('current');
+            const currentRank = RANKS[player.rankId];
+            const nextRank = RANKS[player.rankId + 1];
+
+            const completedQuestsInCurrentRank = player.completedQuests[player.rankId]?.length || 0;
+            const totalQuestsInCurrentRank = MOCK_QUESTS[player.rankId]?.length || 0;
+            const progress = totalQuestsInCurrentRank > 0 ? Math.round((completedQuestsInCurrentRank / totalQuestsInCurrentRank) * 100) : 0;
+            
+            return (
+                <div>
+                    <header className="p-4 flex justify-between items-center bg-gray-900/80 backdrop-blur-sm sticky top-0 z-10 border-b border-gray-800">
+                        <div>
+                            <p className="text-sm text-gray-400">{player.name}</p>
+                            <p className="font-bold text-white">スキルチャレンジ</p>
+                        </div>
+                        <button onClick={onLogout} className="flex items-center space-x-2 text-red-400 hover:text-red-300">
+                            <LogoutIcon />
+                            <span>ログアウト</span>
+                        </button>
+                    </header>
+
+                    <div className="p-4">
+                        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
+                            <p className="text-gray-400 text-sm">現在のランク</p>
+                            <img 
+                                src={currentRank.badgeUrl}
+                                alt={`${currentRank.name_jp} Badge`}
+                                className="mx-auto my-3 h-24 w-24 object-contain"
+                                onError={(e) => { e.target.outerHTML = `<div class="mx-auto my-3 h-24 w-24 flex items-center justify-center bg-gray-700 rounded-full text-gray-500 text-xs">NO IMG</div>` }}
+                            />
+                            <p className="text-gray-300">{currentRank.name_jp}</p>
+
+                            <div className="mt-4">
+                                <p className="text-xs text-gray-400 mb-1 text-left">次のランクへの進捗: {progress}%</p>
+                                <div className="w-full bg-gray-700 rounded-full h-2.5">
+                                    <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6">
+                            <h3 className="text-lg font-bold text-white mb-3">バッジコレクション</h3>
+                            <div className="grid grid-cols-3 gap-4">
+                                {Object.values(RANKS).map((rank, index) => {
+                                    const isUnlocked = (index + 1) <= player.rankId;
+                                    return (
+                                        <div key={rank.name} className={`p-3 rounded-lg flex flex-col items-center justify-center ${isUnlocked ? 'bg-gray-800' : 'bg-gray-800/50'}`}>
+                                            <img
+                                                src={rank.badgeUrl}
+                                                alt={`${rank.name_jp} Badge`}
+                                                className={`h-16 w-16 object-contain ${!isUnlocked && 'opacity-30'}`}
+                                                onError={(e) => { e.target.outerHTML = `<div class="h-16 w-16 flex items-center justify-center bg-gray-700 rounded-full text-gray-500 text-xs">NO IMG</div>` }}
+                                            />
+                                            <p className={`mt-2 text-xs font-semibold ${isUnlocked ? 'text-white' : 'text-gray-500'}`}>{rank.name_jp}</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="sticky top-[73px] z-10 bg-gray-900">
+                        <div className="flex border-b border-gray-700">
+                            <button onClick={() => setCurrentTab('current')} className={`w-1/2 p-4 text-center font-bold ${currentTab === 'current' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400'}`}>
+                                {currentRank.name_jp}
+                            </button>
+                            {nextRank && (
+                                <button onClick={() => setCurrentTab('next')} className={`w-1/2 p-4 text-center font-bold ${currentTab === 'next' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400'}`}>
+                                    {nextRank.name_jp}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="p-4 space-y-3">
+                       { (currentTab === 'current' ? MOCK_QUESTS[player.rankId] : MOCK_QUESTS[player.rankId + 1])?.map(quest => {
+                           const isCompleted = player.completedQuests[player.rankId]?.includes(quest.id);
+                           return (
+                               <div key={quest.id} className="bg-gray-800 p-4 rounded-lg flex justify-between items-center border border-gray-700">
+                                   <div>
+                                       <p className="font-bold text-white">{quest.title}</p>
+                                   </div>
+                                   <div className="flex items-center space-x-2">
+                                       <a href={quest.videoUrl} target="_blank" className="p-2 rounded-full bg-gray-700 hover:bg-gray-600">
+                                            <VideoCameraIcon />
+                                       </a>
+                                       {isCompleted ? (
+                                           <span className="text-green-400 font-bold text-sm">完了</span>
+                                       ) : (
+                                           <button className="bg-yellow-500 text-black px-3 py-1 rounded-full font-bold text-sm">申請</button>
+                                       )}
+                                   </div>
+                               </div>
+                           );
+                       })}
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [view, setView] = React.useState('login'); // 'login', 'signup', 'loggedIn'
+            const [player, setPlayer] = React.useState(null);
+
+            const handleLogin = () => {
+                setPlayer(MOCK_PLAYER);
+                setView('loggedIn');
+            };
+
+            const handleSignUp = () => {
+                // In a real app, this would involve API calls.
+                // For now, we'll just log in the mock player.
+                setPlayer(MOCK_PLAYER);
+                setView('loggedIn');
+            };
+
+            const handleLogout = () => {
+                setPlayer(null);
+                setView('login');
+            };
+
+            const renderContent = () => {
+                switch (view) {
+                    case 'login':
+                        return <LoginScreen onLogin={handleLogin} goToSignUp={() => setView('signup')} />;
+                    case 'signup':
+                        return <SignUpScreen onSignUp={handleSignUp} goToLogin={() => setView('login')} />;
+                    case 'loggedIn':
+                        return <DashboardScreen player={player} onLogout={handleLogout} />;
+                    default:
+                        return <LoginScreen onLogin={handleLogin} goToSignUp={() => setView('signup')} />;
+                }
+            };
+            
+            return (
+                <div className="bg-black min-h-screen text-white font-sans">
+                    <main className="max-w-md mx-auto bg-gray-900 min-h-screen">
+                        {renderContent()}
+                    </main>
+                </div>
+            );
+        }
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
