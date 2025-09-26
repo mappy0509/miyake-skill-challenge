@@ -14,6 +14,7 @@
     
     <!-- ▼▼▼ Firebase ライブラリの読み込み ▼▼▼ -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <!-- ▲▲▲ Firebase ライブラリの読み込み ▲▲▲ -->
 
@@ -37,6 +38,7 @@
     <script type="text/babel">
         // --- Firebaseの初期化 ---
         const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
         const db = firebase.firestore();
 
         // --- コーチ用ログイン情報 ---
@@ -379,20 +381,39 @@
         // --- メインアプリケーションコンポーネント ---
         function App() {
             const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+            const [isLoading, setIsLoading] = React.useState(true);
             const [errorMessage, setErrorMessage] = React.useState('');
+
+            React.useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged(user => {
+                    // 匿名ユーザーでもユーザーオブジェクトは存在するので、これでログイン状態を維持できる
+                    setIsLoggedIn(!!user);
+                    setIsLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
 
             const handleLogin = (teamId, password) => {
                 setErrorMessage('');
                 if (teamId === COACH_TEAM_ID && password === COACH_PASSWORD) {
-                    setIsLoggedIn(true);
+                    setIsLoading(true);
+                    auth.signInAnonymously().catch((error) => {
+                        console.error("Anonymous sign-in failed:", error);
+                        setErrorMessage('データベースへの接続に失敗しました。');
+                        setIsLoading(false);
+                    });
                 } else {
                     setErrorMessage('チームIDまたはパスワードが間違っています。');
                 }
             };
 
             const handleLogout = () => {
-                setIsLoggedIn(false);
+                auth.signOut();
             };
+            
+            if (isLoading) {
+                return <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center">読み込み中...</div>;
+            }
 
             if (isLoggedIn) {
                 return <MainApp onLogout={handleLogout} />;
@@ -413,3 +434,4 @@
     </script>
 </body>
 </html>
+
