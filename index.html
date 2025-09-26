@@ -11,228 +11,450 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <!-- Babel to transpile JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Custom Font -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- ▼▼▼ Firebase ライブラリの読み込み ▼▼▼ -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <!-- ▲▲▲ Firebase ライブラリの読み込み ▲▲▲ -->
+
+    <!-- ▼▼▼ 作成した設定ファイルと共通データを読み込み ▼▼▼ -->
+    <script src="firebase_config.js"></script>
+    <script src="shared_data.js"></script>
+    <!-- ▲▲▲ 作成した設定ファイルと共通データを読み込み ▲▲▲ -->
+    
     <style>
-        body { background-color: #000000; }
+        body { background-color: #000000; font-family: 'Noto Sans JP', sans-serif; }
         .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- 共通データを読み込み -->
-    <script src="shared_data.js"></script>
-
     <script type="text/babel">
+        // --- Firebaseの初期化 ---
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
         // --- アイコンコンポーネント ---
-        const VideoCameraIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 001.553.832l3-2a1 1 0 000-1.664l-3-2z" />
-            </svg>
-        );
-        const LogoutIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-        );
+        const HomeIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>);
+        const ClipboardListIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>);
+        const SparklesIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.293 2.293a1 1 0 010 1.414L10 12l-2 2 2.293 2.293a1 1 0 010 1.414L5 21m14-14l-2.293 2.293a1 1 0 01-1.414 0L12 10l2-2 2.293-2.293a1 1 0 011.414 0z" /></svg>);
+        const VideoCameraIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 001.553.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>);
+        const CheckCircleIcon = (props) => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" {...props}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>);
 
         // --- 画面コンポーネント ---
-        
-        function LoginScreen({ onLogin, goToSignUp }) {
-            return (
-                <div className="p-6 flex flex-col justify-center min-h-screen">
-                    <h1 className="text-4xl font-bold text-green-400 text-center">MIYAKE D'UNKS</h1>
-                    <p className="text-center text-gray-400 mt-2 mb-12">SKILL CHALLENGE APP</p>
-                    
-                    <div className="space-y-4">
-                        <input type="email" placeholder="メールアドレス" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-                        <input type="password" placeholder="パスワード" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-                    </div>
-                    
-                    <button onClick={onLogin} className="w-full mt-8 bg-green-500 text-black p-4 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">
-                        ログイン
-                    </button>
-                    
-                    <button onClick={goToSignUp} className="mt-4 text-center text-green-400 hover:text-green-300">
-                        アカウント新規登録はこちら
-                    </button>
-                </div>
-            );
-        }
 
-        function SignUpScreen({ onSignUp, goToLogin }) {
-            return (
-                <div className="p-6 flex flex-col justify-center min-h-screen">
-                    <h1 className="text-3xl font-bold text-green-400 text-center mb-8">アカウント作成</h1>
-                    
-                    <div className="space-y-4">
-                        <input type="text" placeholder="名前 (フルネーム)" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-                        <input type="email" placeholder="メールアドレス" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-                        <input type="password" placeholder="パスワード" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-                        <input type="password" placeholder="パスワード (確認用)" className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
-                    </div>
-                    
-                    <button onClick={onSignUp} className="w-full mt-8 bg-green-500 text-black p-4 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">
-                        登録する
-                    </button>
+        function LoginScreen({ onLogin, onNavigateToRegister, setErrorMessage, errorMessage }) {
+            const [email, setEmail] = React.useState('');
+            const [password, setPassword] = React.useState('');
 
-                     <button onClick={goToLogin} className="mt-4 text-center text-green-400 hover:text-green-300">
-                        ログイン画面に戻る
-                    </button>
-                </div>
-            );
-        }
-
-        function DashboardScreen({ player, onLogout }) {
-            const [currentTab, setCurrentTab] = React.useState('current');
-            const currentRank = RANKS[player.rankId];
-            const nextRank = RANKS[player.rankId + 1];
-
-            const completedQuestsInCurrentRank = player.completedQuests[player.rankId]?.length || 0;
-            const totalQuestsInCurrentRank = MOCK_QUESTS[player.rankId]?.length || 0;
-            const progress = totalQuestsInCurrentRank > 0 ? Math.round((completedQuestsInCurrentRank / totalQuestsInCurrentRank) * 100) : 0;
-            
-            return (
-                <div>
-                    <header className="p-4 flex justify-between items-center bg-gray-900/80 backdrop-blur-sm sticky top-0 z-10 border-b border-gray-800">
-                        <div>
-                            <p className="text-sm text-gray-400">{player.name}</p>
-                            <p className="font-bold text-white">スキルチャレンジ</p>
-                        </div>
-                        <button onClick={onLogout} className="flex items-center space-x-2 text-red-400 hover:text-red-300">
-                            <LogoutIcon />
-                            <span>ログアウト</span>
-                        </button>
-                    </header>
-
-                    <div className="p-4">
-                        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
-                            <p className="text-gray-400 text-sm">現在のランク</p>
-                            <img 
-                                src={currentRank.badgeUrl}
-                                alt={`${currentRank.name_jp} Badge`}
-                                className="mx-auto my-3 h-24 w-24 object-contain"
-                                onError={(e) => { e.target.outerHTML = `<div class="mx-auto my-3 h-24 w-24 flex items-center justify-center bg-gray-700 rounded-full text-gray-500 text-xs">NO IMG</div>` }}
-                            />
-                            <p className="text-gray-300">{currentRank.name_jp}</p>
-
-                            <div className="mt-4">
-                                <p className="text-xs text-gray-400 mb-1 text-left">次のランクへの進捗: {progress}%</p>
-                                <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                    <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-6">
-                            <h3 className="text-lg font-bold text-white mb-3">バッジコレクション</h3>
-                            <div className="grid grid-cols-3 gap-4">
-                                {Object.values(RANKS).map((rank, index) => {
-                                    const isUnlocked = (index + 1) <= player.rankId;
-                                    return (
-                                        <div key={rank.name} className={`p-3 rounded-lg flex flex-col items-center justify-center ${isUnlocked ? 'bg-gray-800' : 'bg-gray-800/50'}`}>
-                                            <img
-                                                src={rank.badgeUrl}
-                                                alt={`${rank.name_jp} Badge`}
-                                                className={`h-16 w-16 object-contain ${!isUnlocked && 'opacity-30'}`}
-                                                onError={(e) => { e.target.outerHTML = `<div class="h-16 w-16 flex items-center justify-center bg-gray-700 rounded-full text-gray-500 text-xs">NO IMG</div>` }}
-                                            />
-                                            <p className={`mt-2 text-xs font-semibold ${isUnlocked ? 'text-white' : 'text-gray-500'}`}>{rank.name_jp}</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="sticky top-[73px] z-10 bg-gray-900">
-                        <div className="flex border-b border-gray-700">
-                            <button onClick={() => setCurrentTab('current')} className={`w-1/2 p-4 text-center font-bold ${currentTab === 'current' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400'}`}>
-                                {currentRank.name_jp}
-                            </button>
-                            {nextRank && (
-                                <button onClick={() => setCurrentTab('next')} className={`w-1/2 p-4 text-center font-bold ${currentTab === 'next' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400'}`}>
-                                    {nextRank.name_jp}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <div className="p-4 space-y-3">
-                       { (currentTab === 'current' ? MOCK_QUESTS[player.rankId] : MOCK_QUESTS[player.rankId + 1])?.map(quest => {
-                           const isCompleted = player.completedQuests[player.rankId]?.includes(quest.id);
-                           return (
-                               <div key={quest.id} className="bg-gray-800 p-4 rounded-lg flex justify-between items-center border border-gray-700">
-                                   <div>
-                                       <p className="font-bold text-white">{quest.title}</p>
-                                   </div>
-                                   <div className="flex items-center space-x-2">
-                                       <a href={quest.videoUrl} target="_blank" className="p-2 rounded-full bg-gray-700 hover:bg-gray-600">
-                                            <VideoCameraIcon />
-                                       </a>
-                                       {isCompleted ? (
-                                           <span className="text-green-400 font-bold text-sm">完了</span>
-                                       ) : (
-                                           <button className="bg-yellow-500 text-black px-3 py-1 rounded-full font-bold text-sm">申請</button>
-                                       )}
-                                   </div>
-                               </div>
-                           );
-                       })}
-                    </div>
-                </div>
-            );
-        }
-
-        function App() {
-            const [view, setView] = React.useState('login'); // 'login', 'signup', 'loggedIn'
-            const [player, setPlayer] = React.useState(null);
-
-            const handleLogin = () => {
-                setPlayer(MOCK_PLAYER);
-                setView('loggedIn');
-            };
-
-            const handleSignUp = () => {
-                // In a real app, this would involve API calls.
-                // For now, we'll just log in the mock player.
-                setPlayer(MOCK_PLAYER);
-                setView('loggedIn');
-            };
-
-            const handleLogout = () => {
-                setPlayer(null);
-                setView('login');
-            };
-
-            const renderContent = () => {
-                switch (view) {
-                    case 'login':
-                        return <LoginScreen onLogin={handleLogin} goToSignUp={() => setView('signup')} />;
-                    case 'signup':
-                        return <SignUpScreen onSignUp={handleSignUp} goToLogin={() => setView('login')} />;
-                    case 'loggedIn':
-                        return <DashboardScreen player={player} onLogout={handleLogout} />;
-                    default:
-                        return <LoginScreen onLogin={handleLogin} goToSignUp={() => setView('signup')} />;
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (!email || !password) {
+                    setErrorMessage("メールアドレスとパスワードを入力してください。");
+                    return;
                 }
+                onLogin(email, password);
             };
-            
+
             return (
-                <div className="bg-black min-h-screen text-white font-sans">
+                <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+                    <h1 className="text-3xl font-bold text-green-400 mb-2">MIYAKE D'UNKS</h1>
+                    <p className="text-gray-400 mb-8">SKILL CHALLENGE</p>
+                    <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="メールアドレス" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="パスワード" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
+                        <button type="submit" className="w-full bg-green-500 text-black p-3 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">ログイン</button>
+                    </form>
+                    <button onClick={onNavigateToRegister} className="mt-6 text-green-400 hover:underline">新しいアカウントを作成する</button>
+                </div>
+            );
+        }
+
+        function RegisterScreen({ onRegister, onNavigateToLogin, setErrorMessage, errorMessage }) {
+            const [name, setName] = React.useState('');
+            const [email, setEmail] = React.useState('');
+            const [password, setPassword] = React.useState('');
+
+            const handleRegister = (e) => {
+                e.preventDefault();
+                if(!name || !email || !password) {
+                    setErrorMessage("すべての項目を入力してください。");
+                    return;
+                }
+                onRegister(email, password, name);
+            };
+
+            return (
+                <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+                    <h1 className="text-3xl font-bold text-green-400 mb-2">アカウント作成</h1>
+                    <p className="text-gray-400 mb-8">新しいアカウントを作成します</p>
+                    <form onSubmit={handleRegister} className="w-full max-w-sm space-y-4">
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="選手名" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="メールアドレス" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="パスワード (6文字以上)" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
+                        <button type="submit" className="w-full bg-green-500 text-black p-3 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">登録する</button>
+                    </form>
+                    <button onClick={onNavigateToLogin} className="mt-6 text-green-400 hover:underline">ログイン画面に戻る</button>
+                </div>
+            );
+        }
+
+        function DashboardScreen({ player }) {
+            const currentRank = RANKS[player.rankId];
+            const nextRankId = player.rankId + 1;
+            const nextRank = RANKS[nextRankId];
+
+            return (
+                <div className="p-4">
+                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
+                        <p className="text-gray-400 text-sm">現在のランク</p>
+                        <img 
+                            src={currentRank.badgeUrl} 
+                            alt={currentRank.name_jp} 
+                            className="w-24 h-24 mx-auto my-3"
+                            onError={(e) => { e.target.src = `https://placehold.co/96x96/1a202c/48bb78?text=${currentRank.name.slice(0,1)}`; }}
+                        />
+                        <p className="text-white text-lg font-bold">{player.name}</p>
+                    </div>
+
+                    <div className="bg-gray-800 rounded-lg p-4 mt-4 border border-gray-700">
+                        <div className="flex justify-between items-center mb-2">
+                             <p className="text-gray-300 text-sm">次のランクへの進捗</p>
+                             <p className="text-white font-bold">{player.progress || 0}%</p>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-3">
+                             <div className="bg-gradient-to-r from-green-500 to-green-400 h-3 rounded-full" style={{ width: `${player.progress || 0}%` }}></div>
+                        </div>
+                         {nextRank && <p className="text-right text-gray-400 text-xs mt-1">{nextRank.name_jp} まで</p>}
+                    </div>
+                </div>
+            );
+        }
+
+        function QuestScreen({ player }) {
+            const [quests, setQuests] = React.useState({});
+            const [questStatuses, setQuestStatuses] = React.useState({});
+            const [view, setView] = React.useState('current');
+            const currentRankId = player.rankId;
+            const maxRankId = Object.keys(RANKS).length;
+            const hasNextRank = currentRankId < maxRankId;
+            const nextRankId = hasNextRank ? currentRankId + 1 : null;
+            
+            const questsToShow = view === 'current' ? (quests[currentRankId] || []) : (nextRankId ? quests[nextRankId] || [] : []);
+
+
+            React.useEffect(() => {
+                // クエスト一覧を取得
+                const unsubscribeQuests = db.collection('quests').onSnapshot(snapshot => {
+                    const questsData = {};
+                    snapshot.docs.forEach(doc => {
+                        const quest = { id: doc.id, ...doc.data() };
+                        if (!questsData[quest.rankId]) {
+                            questsData[quest.rankId] = [];
+                        }
+                        questsData[quest.rankId].push(quest);
+                    });
+                    setQuests(questsData);
+                });
+
+                // 申請状況を取得
+                const unsubscribeApprovals = db.collection('approvals')
+                    .where('playerId', '==', player.id)
+                    .where('status', '==', 'pending')
+                    .onSnapshot(snapshot => {
+                        const pendingQuests = {};
+                        snapshot.docs.forEach(doc => {
+                            pendingQuests[doc.data().questId] = true;
+                        });
+
+                        const completedQuests = (player.completedQuests || []).reduce((acc, questId) => {
+                            acc[questId] = true;
+                            return acc;
+                        }, {});
+
+                        setQuestStatuses({ pending: pendingQuests, completed: completedQuests });
+                    });
+                
+                return () => {
+                    unsubscribeQuests();
+                    unsubscribeApprovals();
+                };
+            }, [player.id, player.completedQuests]);
+            
+            const handleApplyQuest = (quest) => {
+                db.collection('approvals').add({
+                    playerId: player.id,
+                    playerName: player.name,
+                    questId: quest.id,
+                    questTitle: quest.title,
+                    rankId: quest.rankId,
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(err => console.error("Error applying for quest: ", err));
+            };
+
+            const getQuestStatus = (questId) => {
+                if (questStatuses.completed && questStatuses.completed[questId]) return 'completed';
+                if (questStatuses.pending && questStatuses.pending[questId]) return 'pending';
+                return 'none';
+            };
+
+            return (
+                <div className="p-4">
+                    <div className="flex bg-gray-800 rounded-lg p-1 border border-gray-700">
+                        <button onClick={() => setView('current')} className={`w-1/2 p-2 rounded-md font-bold text-sm ${view === 'current' ? 'bg-green-500 text-black' : 'text-gray-300'}`}>
+                            {RANKS[currentRankId].name_jp}
+                        </button>
+                         <button 
+                            onClick={() => hasNextRank && setView('next')} 
+                            className={`w-1/2 p-2 rounded-md font-bold text-sm ${view === 'next' ? 'bg-green-500 text-black' : 'text-gray-300'} ${!hasNextRank ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={!hasNextRank}
+                        >
+                            {nextRankId ? RANKS[nextRankId].name_jp : 'MAX RANK'}
+                        </button>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                        {questsToShow.map(quest => {
+                            const status = getQuestStatus(quest.id);
+                            return (
+                                <div key={quest.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-bold text-white">{quest.title}</p>
+                                            <p className="text-sm text-gray-400 mt-1">{quest.description}</p>
+                                        </div>
+                                        <div className="flex-shrink-0 ml-4">
+                                            {status === 'completed' ? (
+                                                <div className="flex items-center space-x-1 text-green-400">
+                                                    <CheckCircleIcon />
+                                                    <span className="text-xs font-bold">完了</span>
+                                                </div>
+                                            ) : status === 'pending' ? (
+                                                <button className="bg-gray-600 text-white px-3 py-1 rounded-full font-bold text-xs" disabled>申請済み</button>
+                                            ) : (
+                                                <button onClick={() => handleApplyQuest(quest)} className="bg-yellow-500 text-black px-3 py-1 rounded-full font-bold text-xs">申請</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {quest.videoUrl && (
+                                        <a href={quest.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-full font-semibold text-xs mt-3">
+                                            <VideoCameraIcon />
+                                            <span>動画で確認</span>
+                                        </a>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        function BadgeCollectionScreen({ player }) {
+            return (
+                 <div className="p-4">
+                    <h2 className="text-xl font-bold text-white mb-4">バッジコレクション</h2>
+                    <div className="grid grid-cols-3 gap-4">
+                        {Object.entries(RANKS).map(([rankId, rank]) => {
+                            const id = parseInt(rankId, 10);
+                            return (
+                                <div key={id} className={`bg-gray-800 p-4 rounded-lg border border-gray-700 text-center transition-opacity ${player.rankId >= id ? 'opacity-100' : 'opacity-40'}`}>
+                                    <img 
+                                        src={rank.badgeUrl}
+                                        alt={rank.name_jp}
+                                        className="w-16 h-16 mx-auto"
+                                        onError={(e) => { e.target.src = `https://placehold.co/64x64/1a202c/48bb78?text=${rank.name.slice(0,1)}`; }}
+                                    />
+                                    <p className={`mt-2 font-bold text-xs ${player.rankId >= id ? 'text-green-400' : 'text-gray-500'}`}>{rank.name_jp}</p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                 </div>
+            );
+        }
+
+        function MainApp({ user, onLogout }) {
+             const [currentView, setCurrentView] = React.useState('dashboard');
+             const [player, setPlayer] = React.useState(null);
+             const [loading, setLoading] = React.useState(true);
+            
+             React.useEffect(() => {
+                if (user) {
+                    // user.uid を使ってFirestoreからプレーヤー情報をリアルタイムで取得
+                    const unsubscribe = db.collection('players').doc(user.uid)
+                        .onSnapshot(doc => {
+                            if (doc.exists) {
+                                setPlayer({ id: doc.id, ...doc.data() });
+                            } else {
+                                console.error("Player data not found!");
+                            }
+                            setLoading(false);
+                        });
+                    
+                    return () => unsubscribe(); // クリーンアップ
+                }
+            }, [user]);
+
+             const renderContent = () => {
+                switch(currentView) {
+                    case 'dashboard': return <DashboardScreen player={player} />;
+                    case 'quests': return <QuestScreen player={player} />;
+                    case 'collection': return <BadgeCollectionScreen player={player} />;
+                    default: return <DashboardScreen player={player} />;
+                }
+             };
+
+            if (loading) {
+                return <div className="bg-black text-white min-h-screen flex items-center justify-center">プレーヤー情報を読み込み中...</div>;
+            }
+
+            if (!player) {
+                return (
+                    <div className="bg-black text-white min-h-screen flex flex-col items-center justify-center text-center p-4">
+                        <p>プレーヤー情報が見つかりませんでした。</p>
+                        <p className="text-sm text-gray-400 mt-2">コーチに連絡して、アカウントが正しく設定されているか確認してください。</p>
+                        <button onClick={onLogout} className="mt-6 bg-red-500 text-white px-4 py-2 rounded">ログアウト</button>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="bg-black min-h-screen text-white">
                     <main className="max-w-md mx-auto bg-gray-900 min-h-screen">
-                        {renderContent()}
+                        <header className="p-4 flex justify-between items-center">
+                            <h1 className="text-lg font-bold text-green-400">スキルチャレンジ</h1>
+                            <button onClick={onLogout} className="text-gray-400 hover:text-white text-sm">ログアウト</button>
+                        </header>
+                        <div className="pb-20">{renderContent()}</div>
+                        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 flex justify-around">
+                            <button onClick={() => setCurrentView('dashboard')} className={`p-3 flex flex-col items-center ${currentView === 'dashboard' ? 'text-green-400' : 'text-gray-400'}`}><HomeIcon /><span className="text-xs mt-1">ホーム</span></button>
+                            <button onClick={() => setCurrentView('quests')} className={`p-3 flex flex-col items-center ${currentView === 'quests' ? 'text-green-400' : 'text-gray-400'}`}><ClipboardListIcon /><span className="text-xs mt-1">クエスト</span></button>
+                            <button onClick={() => setCurrentView('collection')} className={`p-3 flex flex-col items-center ${currentView === 'collection' ? 'text-green-400' : 'text-gray-400'}`}><SparklesIcon /><span className="text-xs mt-1">バッジ</span></button>
+                        </nav>
                     </main>
                 </div>
             );
         }
 
+        // --- メインアプリケーションコンポーネント ---
+        function App() {
+            const [user, setUser] = React.useState(null);
+            const [isLoading, setIsLoading] = React.useState(true);
+            const [currentView, setCurrentView] = React.useState('login'); // 'login', 'register'
+            const [errorMessage, setErrorMessage] = React.useState('');
+
+            // Firebaseの認証状態を監視する
+            React.useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged(user => {
+                    setUser(user);
+                    setIsLoading(false);
+                });
+                return () => unsubscribe(); // クリーンアップ
+            }, []);
+            
+            const clearError = () => setErrorMessage('');
+
+            const handleLogin = (email, password) => {
+                clearError();
+                auth.signInWithEmailAndPassword(email, password)
+                    .catch(error => {
+                        switch (error.code) {
+                            case 'auth/user-not-found':
+                            case 'auth/wrong-password':
+                            case 'auth/invalid-credential':
+                                setErrorMessage('メールアドレスまたはパスワードが間違っています。');
+                                break;
+                            default:
+                                setErrorMessage('ログインに失敗しました。');
+                                break;
+                        }
+                    });
+            };
+
+            const handleRegister = (email, password, name) => {
+                clearError();
+                auth.createUserWithEmailAndPassword(email, password)
+                    .then(userCredential => {
+                        const user = userCredential.user;
+                        return db.collection('players').doc(user.uid).set({
+                            name: name,
+                            email: email,
+                            rankId: 1,
+                            progress: 0,
+                            completedQuests: []
+                        });
+                    })
+                    .catch(error => {
+                        switch (error.code) {
+                            case 'auth/email-already-in-use':
+                                setErrorMessage('このメールアドレスは既に使用されています。');
+                                break;
+                            case 'auth/weak-password':
+                                setErrorMessage('パスワードは6文字以上で設定してください。');
+                                break;
+                            default:
+                                setErrorMessage('アカウントの作成に失敗しました。');
+                                break;
+                        }
+                    });
+            };
+            
+            const handleLogout = () => {
+                auth.signOut();
+            };
+
+            if (isLoading) {
+                return <div className="bg-black text-white min-h-screen flex items-center justify-center">読み込み中...</div>;
+            }
+
+            if (user) {
+                return <MainApp user={user} onLogout={handleLogout} />;
+            }
+            
+            if (currentView === 'register') {
+                 return <RegisterScreen 
+                            onRegister={handleRegister} 
+                            onNavigateToLogin={() => { setCurrentView('login'); clearError(); }} 
+                            errorMessage={errorMessage}
+                            setErrorMessage={setErrorMessage}
+                        />;
+            }
+
+            return <LoginScreen 
+                        onLogin={handleLogin} 
+                        onNavigateToRegister={() => { setCurrentView('register'); clearError(); }}
+                        errorMessage={errorMessage}
+                        setErrorMessage={setErrorMessage}
+                    />;
+        }
+
+        // --- DOMにアプリをレンダリング ---
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<App />);
+
     </script>
 </body>
 </html>
