@@ -14,7 +14,6 @@
     
     <!-- ▼▼▼ Firebase ライブラリの読み込み ▼▼▼ -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <!-- ▲▲▲ Firebase ライブラリの読み込み ▲▲▲ -->
 
@@ -38,22 +37,25 @@
     <script type="text/babel">
         // --- Firebaseの初期化 ---
         const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
         const db = firebase.firestore();
+
+        // --- コーチ用ログイン情報 ---
+        const COACH_TEAM_ID = "miyakedunks";
+        const COACH_PASSWORD = "coachpassword";
 
         // --- 画面コンポーネント ---
 
         function LoginScreen({ onLogin, errorMessage, setErrorMessage }) {
-            const [email, setEmail] = React.useState('');
+            const [teamId, setTeamId] = React.useState('');
             const [password, setPassword] = React.useState('');
 
             const handleLogin = (e) => {
                 e.preventDefault();
-                if (!email || !password) {
-                    setErrorMessage("メールアドレスとパスワードを入力してください。");
+                if (!teamId || !password) {
+                    setErrorMessage("チームIDとパスワードを入力してください。");
                     return;
                 }
-                onLogin(email, password);
+                onLogin(teamId, password);
             };
 
             return (
@@ -61,7 +63,7 @@
                     <h1 className="text-3xl font-bold text-green-400 mb-2">コーチ用管理画面</h1>
                     <p className="text-gray-400 mb-8">ログインしてください</p>
                     <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="メールアドレス" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
+                        <input type="text" value={teamId} onChange={e => setTeamId(e.target.value)} placeholder="チームID" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
                         <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="パスワード" className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-400" />
                         {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
                         <button type="submit" className="w-full bg-green-500 text-black p-3 rounded-lg font-bold text-lg hover:bg-green-400 transition-all">ログイン</button>
@@ -376,35 +378,23 @@
 
         // --- メインアプリケーションコンポーネント ---
         function App() {
-            const [user, setUser] = React.useState(null);
-            const [isLoading, setIsLoading] = React.useState(true);
+            const [isLoggedIn, setIsLoggedIn] = React.useState(false);
             const [errorMessage, setErrorMessage] = React.useState('');
 
-            React.useEffect(() => {
-                const unsubscribe = auth.onAuthStateChanged(user => {
-                    setUser(user);
-                    setIsLoading(false);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            const handleLogin = (email, password) => {
+            const handleLogin = (teamId, password) => {
                 setErrorMessage('');
-                auth.signInWithEmailAndPassword(email, password)
-                    .catch(error => {
-                        setErrorMessage('メールアドレスまたはパスワードが間違っています。');
-                    });
+                if (teamId === COACH_TEAM_ID && password === COACH_PASSWORD) {
+                    setIsLoggedIn(true);
+                } else {
+                    setErrorMessage('チームIDまたはパスワードが間違っています。');
+                }
             };
 
             const handleLogout = () => {
-                auth.signOut();
+                setIsLoggedIn(false);
             };
 
-            if (isLoading) {
-                return <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center">読み込み中...</div>;
-            }
-
-            if (user) {
+            if (isLoggedIn) {
                 return <MainApp onLogout={handleLogout} />;
             }
 
