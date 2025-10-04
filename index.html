@@ -4,29 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miyake Dunks Skill Challenge</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React Libraries -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel to transpile JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- ▼▼▼ Firebase ライブラリの読み込み ▼▼▼ -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-    <!-- ▲▲▲ Firebase ライブラリの読み込み ▲▲▲ -->
-
-    <!-- ▼▼▼ 作成した設定ファイルと共通データを読み込み ▼▼▼ -->
     <script src="firebase_config.js"></script>
     <script src="shared_data.js"></script>
-    <!-- ▲▲▲ 作成した設定ファイルと共通データを読み込み ▲▲▲ -->
-    
     <style>
         body { background-color: #000000; font-family: 'Noto Sans JP', sans-serif; }
         .font-orbitron { font-family: 'Orbitron', sans-serif; }
@@ -154,7 +144,6 @@
 
         function QuestScreen({ player }) {
             const [quests, setQuests] = React.useState({});
-            const [questStatuses, setQuestStatuses] = React.useState({});
             const [view, setView] = React.useState('current');
             const currentRankId = player.rankId;
             const maxRankId = Object.keys(RANKS).length;
@@ -162,7 +151,11 @@
             const nextRankId = hasNextRank ? currentRankId + 1 : null;
             
             const questsToShow = view === 'current' ? (quests[currentRankId] || []) : (nextRankId ? quests[nextRankId] || [] : []);
-
+            
+            const completedQuests = (player.completedQuests || []).reduce((acc, questId) => {
+                acc[questId] = true;
+                return acc;
+            }, {});
 
             React.useEffect(() => {
                 // クエスト一覧を取得
@@ -177,49 +170,12 @@
                     });
                     setQuests(questsData);
                 });
-
-                // 申請状況を取得
-                const unsubscribeApprovals = db.collection('approvals')
-                    .where('playerId', '==', player.id)
-                    .where('status', '==', 'pending')
-                    .onSnapshot(snapshot => {
-                        const pendingQuests = {};
-                        snapshot.docs.forEach(doc => {
-                            pendingQuests[doc.data().questId] = true;
-                        });
-
-                        const completedQuests = (player.completedQuests || []).reduce((acc, questId) => {
-                            acc[questId] = true;
-                            return acc;
-                        }, {});
-
-                        setQuestStatuses({ pending: pendingQuests, completed: completedQuests });
-                    });
                 
                 return () => {
                     unsubscribeQuests();
-                    unsubscribeApprovals();
                 };
-            }, [player.id, player.completedQuests]);
+            }, []);
             
-            const handleApplyQuest = (quest) => {
-                db.collection('approvals').add({
-                    playerId: player.id,
-                    playerName: player.name,
-                    questId: quest.id,
-                    questTitle: quest.title,
-                    rankId: quest.rankId,
-                    status: 'pending',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).catch(err => console.error("Error applying for quest: ", err));
-            };
-
-            const getQuestStatus = (questId) => {
-                if (questStatuses.completed && questStatuses.completed[questId]) return 'completed';
-                if (questStatuses.pending && questStatuses.pending[questId]) return 'pending';
-                return 'none';
-            };
-
             return (
                 <div className="p-4">
                     <div className="flex bg-gray-800 rounded-lg p-1 border border-gray-700">
@@ -235,37 +191,30 @@
                         </button>
                     </div>
                     <div className="mt-4 space-y-3">
-                        {questsToShow.map(quest => {
-                            const status = getQuestStatus(quest.id);
-                            return (
-                                <div key={quest.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-bold text-white">{quest.title}</p>
-                                            <p className="text-sm text-gray-400 mt-1">{quest.description}</p>
-                                        </div>
-                                        <div className="flex-shrink-0 ml-4">
-                                            {status === 'completed' ? (
-                                                <div className="flex items-center space-x-1 text-green-400">
-                                                    <CheckCircleIcon />
-                                                    <span className="text-xs font-bold">完了</span>
-                                                </div>
-                                            ) : status === 'pending' ? (
-                                                <button className="bg-gray-600 text-white px-3 py-1 rounded-full font-bold text-xs" disabled>申請済み</button>
-                                            ) : (
-                                                <button onClick={() => handleApplyQuest(quest)} className="bg-yellow-500 text-black px-3 py-1 rounded-full font-bold text-xs">申請</button>
-                                            )}
-                                        </div>
+                        {questsToShow.map(quest => (
+                            <div key={quest.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-white">{quest.title}</p>
+                                        <p className="text-sm text-gray-400 mt-1">{quest.description}</p>
                                     </div>
-                                    {quest.videoUrl && (
-                                        <a href={quest.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-full font-semibold text-xs mt-3">
-                                            <VideoCameraIcon />
-                                            <span>動画で確認</span>
-                                        </a>
-                                    )}
+                                    <div className="flex-shrink-0 ml-4">
+                                        {completedQuests[quest.id] && (
+                                            <div className="flex items-center space-x-1 text-green-400">
+                                                <CheckCircleIcon />
+                                                <span className="text-xs font-bold">完了</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            );
-                        })}
+                                {quest.videoUrl && (
+                                    <a href={quest.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-full font-semibold text-xs mt-3">
+                                        <VideoCameraIcon />
+                                        <span>動画で確認</span>
+                                    </a>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
@@ -318,6 +267,7 @@
             }, [user]);
 
              const renderContent = () => {
+                if (!player) return null;
                 switch(currentView) {
                     case 'dashboard': return <DashboardScreen player={player} />;
                     case 'quests': return <QuestScreen player={player} />;
@@ -458,4 +408,3 @@
     </script>
 </body>
 </html>
-

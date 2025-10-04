@@ -4,25 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miyake Dunks Coach Admin</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React Libraries -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel to transpile JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- ▼▼▼ Firebase ライブラリの読み込み ▼▼▼ -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-    <!-- ▲▲▲ Firebase ライブラリの読み込み ▲▲▲ -->
-
-    <!-- ▼▼▼ 作成した設定ファイルと共通データを読み込み ▼▼▼ -->
     <script src="firebase_config.js"></script>
     <script src="shared_data.js"></script>
-    <!-- ▲▲▲ 作成した設定ファイルと共通データを読み込み ▲▲▲ -->
-
     <style>
         body { background-color: #1a202c; color: #cbd5e0; }
         .modal-overlay {
@@ -77,7 +68,6 @@
         function MainApp({ onLogout }) {
             const [players, setPlayers] = React.useState([]);
             const [quests, setQuests] = React.useState({});
-            const [pendingApprovals, setPendingApprovals] = React.useState([]);
             const [currentView, setCurrentView] = React.useState('players');
             const [isPlayerModalOpen, setPlayerModalOpen] = React.useState(false);
             const [isQuestModalOpen, setQuestModalOpen] = React.useState(false);
@@ -87,10 +77,11 @@
             const [selectedRankId, setSelectedRankId] = React.useState(1);
             const [confirmAction, setConfirmAction] = React.useState(null);
             const [confirmMessage, setConfirmMessage] = React.useState('');
-            
+            const [playerForQuestManagement, setPlayerForQuestManagement] = React.useState(null);
+
             // --- データ取得 ---
             React.useEffect(() => {
-                const unsubscribePlayers = db.collection('players').onSnapshot(snapshot => {
+                const unsubscribePlayers = db.collection('players').orderBy('name').onSnapshot(snapshot => {
                     const playersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setPlayers(playersData);
                 });
@@ -107,21 +98,15 @@
                     setQuests(questsData);
                 });
                 
-                const unsubscribeApprovals = db.collection('approvals').where('status', '==', 'pending').onSnapshot(snapshot => {
-                    const approvalsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setPendingApprovals(approvalsData);
-                });
-
                 return () => {
                     unsubscribePlayers();
                     unsubscribeQuests();
-                    unsubscribeApprovals();
                 };
             }, []);
             
             // --- モーダル制御 ---
             const openPlayerModal = (player = null) => {
-                setSelectedPlayer(player || { name: '', rankId: 1 });
+                setSelectedPlayer(player || { name: '', rankId: 1, progress: 0, completedQuests: [] });
                 setPlayerModalOpen(true);
             };
 
@@ -135,6 +120,10 @@
                 setConfirmAction(() => onConfirm);
                 setConfirmModalOpen(true);
             };
+
+            const openPlayerQuestModal = (player) => {
+                setPlayerForQuestManagement(player);
+            }
             
             // --- データ保存・更新・削除 ---
             const handlePlayerSave = (playerData) => {
@@ -180,11 +169,10 @@
                 });
             };
 
-            const handleApprove = (approval) => {
-                const playerRef = db.collection('players').doc(approval.playerId);
-                const approvalRef = db.collection('approvals').doc(approval.id);
+            const handleQuestStatusChange = (player, quest, shouldComplete) => {
+                const playerRef = db.collection('players').doc(player.id);
 
-                db.runTransaction(async (transaction) => {
+                return db.runTransaction(async (transaction) => {
                     const playerDoc = await transaction.get(playerRef);
                     if (!playerDoc.exists) { throw "Player does not exist!"; }
 
@@ -193,10 +181,16 @@
                     const questsForCurrentRank = quests[currentRankId] || [];
                     const maxRankId = Object.keys(RANKS).length;
 
-                    const newCompletedQuests = [...(playerData.completedQuests || []), approval.questId];
-
+                    const completedQuests = new Set(playerData.completedQuests || []);
+                    if (shouldComplete) {
+                        completedQuests.add(quest.id);
+                    } else {
+                        completedQuests.delete(quest.id);
+                    }
+                    const newCompletedQuests = Array.from(completedQuests);
+                    
                     const completedQuestsForRank = newCompletedQuests.filter(questId => 
-                        questsForCurrentRank.some(q => q.id === questId)
+                        (quests[currentRankId] || []).some(q => q.id === questId)
                     );
                     
                     let newProgress = 0;
@@ -215,14 +209,8 @@
                     }
 
                     transaction.update(playerRef, updates);
-                    transaction.update(approvalRef, { status: 'approved' });
 
-                }).catch(error => console.error("Transaction failed: ", error));
-            };
-
-            const handleDeny = (approvalId) => {
-                db.collection('approvals').doc(approvalId).delete()
-                  .catch(error => console.error("Error denying quest: ", error));
+                });
             };
 
             // --- コンポーネント定義 ---
@@ -230,17 +218,88 @@
                 if (!isOpen) return null;
                 const [name, setName] = React.useState(player.name);
                 const [rankId, setRankId] = React.useState(player.rankId);
+                const [progress, setProgress] = React.useState(player.progress);
+                
                 return (
                     <div className="modal-overlay">
                         <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700">
                             <h3 className="text-xl font-bold mb-4 text-white">選手を編集</h3>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="選手名" className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white mb-4" />
-                            <select value={rankId} onChange={e => setRankId(parseInt(e.target.value))} className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white mb-4">
-                                {Object.entries(RANKS).map(([id, rank]) => <option key={id} value={id}>{rank.name_jp}</option>)}
-                            </select>
-                            <div className="flex justify-end space-x-2">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-sm text-gray-400">選手名</label>
+                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white" />
+                                </div>
+                                <div>
+                                    <label className="text-sm text-gray-400">ランク</label>
+                                    <select value={rankId} onChange={e => setRankId(parseInt(e.target.value))} className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white">
+                                        {Object.entries(RANKS).map(([id, rank]) => <option key={id} value={id}>{rank.name_jp}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-gray-400">進捗 (%)</label>
+                                    <input type="number" value={progress} min="0" max="100" onChange={e => setProgress(parseInt(e.target.value))} className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white" />
+                                </div>
+                            </div>
+                            <div className="flex justify-end space-x-2 mt-6">
                                 <button onClick={onClose} className="px-4 py-2 bg-gray-600 rounded text-white">キャンセル</button>
-                                <button onClick={() => onSave({ ...player, name, rankId })} className="px-4 py-2 bg-green-500 rounded text-black">保存</button>
+                                <button onClick={() => onSave({ ...player, name, rankId, progress })} className="px-4 py-2 bg-green-500 rounded text-black">保存</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+            
+            const PlayerQuestManagementModal = ({ isOpen, onClose, player, quests, onQuestStatusChange }) => {
+                const [loadingQuests, setLoadingQuests] = React.useState({});
+
+                if (!isOpen) return null;
+
+                const rankQuests = quests[player.rankId] || [];
+                const completedQuestsSet = new Set(player.completedQuests || []);
+
+                const handleButtonClick = (quest, shouldComplete) => {
+                    setLoadingQuests(prev => ({ ...prev, [quest.id]: true }));
+                    onQuestStatusChange(player, quest, shouldComplete)
+                        .catch(error => console.error("Quest status change failed: ", error))
+                        .finally(() => {
+                            setLoadingQuests(prev => ({ ...prev, [quest.id]: false }));
+                        });
+                };
+                
+                return (
+                    <div className="modal-overlay">
+                        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg border border-gray-700 max-h-[80vh] flex flex-col">
+                            <div className="flex-shrink-0">
+                                <h3 className="text-xl font-bold mb-1 text-white">{player.name}</h3>
+                                <p className="text-green-400 mb-4">{RANKS[player.rankId]?.name_jp} のクエスト</p>
+                            </div>
+                            <div className="flex-grow overflow-y-auto space-y-3 pr-2">
+                                {rankQuests.length > 0 ? rankQuests.map(quest => {
+                                    const isCompleted = completedQuestsSet.has(quest.id);
+                                    const isLoading = loadingQuests[quest.id];
+                                    return (
+                                         <div key={quest.id} className="bg-gray-700 rounded-lg p-3 flex justify-between items-center">
+                                             <div>
+                                                <p className="font-bold text-white">{quest.title}</p>
+                                                <p className="text-sm text-gray-400">{quest.description}</p>
+                                            </div>
+                                             <div className="flex-shrink-0 ml-4">
+                                                <button 
+                                                    onClick={() => handleButtonClick(quest, !isCompleted)}
+                                                    className={`px-3 py-1 rounded text-xs font-bold w-20 text-center ${isCompleted ? 'bg-yellow-500 text-black' : 'bg-green-500 text-black'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    disabled={isLoading}
+                                                >
+                                                    {isLoading ? '処理中...' : (isCompleted ? 'キャンセル' : 'クリアにする')}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )
+                                }) : (
+                                    <p className="text-gray-400 text-center py-4">このランクにはクエストがありません。</p>
+                                )}
+                            </div>
+                             <div className="flex justify-end mt-6 flex-shrink-0">
+                                <button onClick={onClose} className="px-4 py-2 bg-gray-600 rounded text-white">閉じる</button>
                             </div>
                         </div>
                     </div>
@@ -289,33 +348,38 @@
             };
 
             return (
-                <div className="max-w-4xl mx-auto p-4">
+                <div className="max-w-6xl mx-auto p-4">
                     <header className="flex justify-between items-center mb-6">
                         <h1 className="text-2xl font-bold text-green-400">コーチ用管理画面</h1>
                         <button onClick={onLogout} className="text-gray-400 hover:text-white text-sm bg-gray-700 px-3 py-1 rounded">ログアウト</button>
                     </header>
                     <nav className="flex space-x-2 mb-6 border-b border-gray-700">
                         <button onClick={() => setCurrentView('players')} className={`py-2 px-4 font-semibold ${currentView === 'players' ? 'border-b-2 border-green-400 text-white' : 'text-gray-400'}`}>選手一覧</button>
-                        <button onClick={() => setCurrentView('approvals')} className={`relative py-2 px-4 font-semibold ${currentView === 'approvals' ? 'border-b-2 border-green-400 text-white' : 'text-gray-400'}`}>
-                            承認待ち
-                            {pendingApprovals.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">{pendingApprovals.length}</span>}
-                        </button>
                         <button onClick={() => setCurrentView('quests')} className={`py-2 px-4 font-semibold ${currentView === 'quests' ? 'border-b-2 border-green-400 text-white' : 'text-gray-400'}`}>クエスト管理</button>
                     </nav>
 
                     {currentView === 'players' && (
                         <div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {players.map(player => (
-                                    <div key={player.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                                        <p className="font-bold text-white">{player.name}</p>
-                                        <p className="text-sm text-gray-400">{RANKS[player.rankId]?.name_jp || 'ランク未設定'}</p>
-                                        <div className="w-full bg-gray-700 rounded-full h-2 my-2">
-                                            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${player.progress || 0}%` }}></div>
+                                    <div key={player.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col justify-between">
+                                        <div>
+                                            <p className="font-bold text-white text-lg">{player.name}</p>
+                                            <p className="text-sm text-green-400 mb-2">{RANKS[player.rankId]?.name_jp || 'ランク未設定'}</p>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <p className="text-gray-300 text-xs">進捗</p>
+                                                <p className="text-white font-bold text-sm">{player.progress || 0}%</p>
+                                            </div>
+                                            <div className="w-full bg-gray-700 rounded-full h-2">
+                                                <div className="bg-green-500 h-2 rounded-full" style={{ width: `${player.progress || 0}%` }}></div>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-end space-x-2 mt-2">
-                                            <button onClick={() => openPlayerModal(player)} className="text-xs bg-blue-500 text-white px-2 py-1 rounded">編集</button>
-                                            <button onClick={() => handleDeletePlayer(player.id)} className="text-xs bg-red-500 text-white px-2 py-1 rounded">削除</button>
+                                        <div className="flex justify-between items-center mt-4">
+                                            <button onClick={() => openPlayerQuestModal(player)} className="text-xs bg-green-500 text-black px-3 py-2 rounded font-bold w-full mr-2">クエスト達成</button>
+                                            <div className="flex space-x-1">
+                                                <button onClick={() => openPlayerModal(player)} className="text-xs bg-blue-500 text-white p-2 rounded">⚙️</button>
+                                                <button onClick={() => handleDeletePlayer(player.id)} className="text-xs bg-red-500 text-white p-2 rounded">🗑️</button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -323,29 +387,6 @@
                         </div>
                     )}
                     
-                    {currentView === 'approvals' && (
-                        <div className="space-y-4">
-                             {pendingApprovals.length > 0 ? (
-                                pendingApprovals.map(approval => (
-                                    <div key={approval.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700 flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold text-white">{approval.playerName}</p>
-                                            <p className="text-sm text-gray-400">クエスト: {approval.questTitle}</p>
-                                        </div>
-                                        <div className="flex space-x-2">
-                                            <button onClick={() => handleDeny(approval.id)} className="bg-red-500 text-white px-3 py-1 rounded text-sm">否認</button>
-                                            <button onClick={() => handleApprove(approval)} className="bg-green-500 text-black px-3 py-1 rounded text-sm">承認</button>
-                                        </div>
-                                    </div>
-                                ))
-                             ) : (
-                                <div className="text-center text-gray-400 py-8">
-                                    現在承認待ちのクエストはありません。
-                                </div>
-                             )}
-                        </div>
-                    )}
-
                      {currentView === 'quests' && (
                          <div>
                             <div className="flex flex-wrap gap-2 mb-4">
@@ -372,6 +413,7 @@
                      )}
                      
                     <PlayerModal isOpen={isPlayerModalOpen} onClose={() => setPlayerModalOpen(false)} onSave={handlePlayerSave} player={selectedPlayer} />
+                    <PlayerQuestManagementModal isOpen={!!playerForQuestManagement} onClose={() => setPlayerForQuestManagement(null)} player={playerForQuestManagement} quests={quests} onQuestStatusChange={handleQuestStatusChange} />
                     <QuestModal isOpen={isQuestModalOpen} onClose={() => setQuestModalOpen(false)} onSave={handleQuestSave} currentQuest={questToEdit} />
                     <ConfirmModal isOpen={isConfirmModalOpen} onClose={() => setConfirmModalOpen(false)} onConfirm={confirmAction} message={confirmMessage} />
                 </div>
@@ -386,7 +428,6 @@
 
             React.useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged(user => {
-                    // 匿名ユーザーでもユーザーオブジェクトは存在するので、これでログイン状態を維持できる
                     setIsLoggedIn(!!user);
                     setIsLoading(false);
                 });
@@ -434,4 +475,3 @@
     </script>
 </body>
 </html>
-
